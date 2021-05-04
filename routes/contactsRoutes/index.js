@@ -6,7 +6,7 @@ const {
   addContact,
   updateContact,
   removeContact,
-} = require("../controller/index.js");
+} = require("../../controller/contacts.js");
 const { validatePatch, validatePostPut } = require("./inputValidation.js");
 
 router.get("/", getAll);
