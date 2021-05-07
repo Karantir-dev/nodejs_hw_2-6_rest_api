@@ -12,7 +12,7 @@ const schemaPatch = Joi.object({
   email: Joi.string().email().optional(),
   phone: Joi.string().optional(),
   favorite: Joi.boolean().optional(),
-}).or("name", "email", "phone", "favorite");
+}).or("name", "email", "phone", "favorite", "subscription");
 
 module.exports = {
   validatePatch: async (req, res, next) => {

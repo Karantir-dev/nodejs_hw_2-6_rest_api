@@ -1,12 +1,14 @@
+const HttpCode = require("../helpers/constants");
 const contacts = require("../model/contacts");
 
-const getAll = async (_, res, next) => {
+const getAll = async (req, res, next) => {
   try {
-    const allContacts = await contacts.dbGetAll();
+    const userId = req.user?.id;
+    const allContacts = await contacts.dbGetAll(userId, req.query);
     return res.json({
       status: "success",
-      code: 200,
-      data: { allContacts },
+      code: HttpCode.OK,
+      ResponseBody: { ...allContacts },
     });
   } catch (err) {
     next(err);
@@ -15,18 +17,28 @@ const getAll = async (_, res, next) => {
 
 const getContactById = async (req, res, next) => {
   try {
-    const contact = await contacts.dbGetContactById(req.params.contactId);
+    const userId = req.user?.id;
+    const contact = await contacts.dbGetContactById(
+      req.params.contactId,
+      userId
+    );
 
-    return res.json({
-      status: "success",
-      code: 200,
-      data: { contact },
+    if (contact) {
+      return res.json({
+        status: "success",
+        code: HttpCode.OK,
+        ResponseBody: { contact },
+      });
+    }
+
+    return res.status(HttpCode.NOT_FOUND).json({
+      status: `${HttpCode.NOT_FOUND} Not Found`,
     });
   } catch (err) {
-    err.status = "error";
+    err.status = "Bad Request";
     if (err.name === "CastError") {
-      err.code = 404;
-      err.message = `Сontact with id ${err.value} not found.`;
+      err.code = HttpCode.BAD_REQUEST;
+      err.message = "Id format is not correct.";
     }
 
     next(err);
@@ -35,17 +47,20 @@ const getContactById = async (req, res, next) => {
 
 const addContact = async (req, res, next) => {
   try {
-    const contact = await contacts.dbAddContact(req.body);
+    const userId = req.user?.id;
+    const contact = await contacts.dbAddContact(req.body, userId);
 
-    return res.status(201).json({
-      status: "success",
-      code: 201,
-      data: { contact },
-    });
+    if (contact) {
+      return res.status(HttpCode.CREATED).json({
+        status: "success",
+        code: HttpCode.CREATED,
+        ResponseBody: { contact },
+      });
+    }
   } catch (err) {
     err.status = "error";
     if (err.name === "MongoError") {
-      err.code = 400;
+      err.code = HttpCode.BAD_REQUEST;
       err.message = `Contact with this field ${JSON.stringify(
         err.keyValue
       ).replace(/"/g, "'")} already exist`;
@@ -56,29 +71,34 @@ const addContact = async (req, res, next) => {
 
 const updateContact = async (req, res, next) => {
   try {
+    const userId = req.user?.id;
     const contact = await contacts.dbUpdateContact(
       req.params.contactId,
+      userId,
       req.body
     );
 
     if (contact) {
       return res.json({
         status: "success",
-        code: 200,
-        data: { contact },
+        code: HttpCode.OK,
+        ResponseBody: { contact },
       });
     }
+
+    return res.status(HttpCode.NOT_FOUND).json({
+      Status: `${HttpCode.NOT_FOUND} Not found`,
+    });
   } catch (err) {
-    err.status = "error";
+    err.status = "Bad Request";
 
     if (err.name === "CastError") {
-      err.code = 404;
-      err.message = `Contact with this id ${err.value._id} is absent`;
+      err.code = HttpCode.BAD_REQUEST;
+      err.message = "Id format is not correct.";
     } else if (err.name === "MongoError") {
-      err.code = 400;
-      err.message = `Contact with this field ${JSON.stringify(
-        err.keyValue
-      ).replace(/"/g, "'")} already exist`;
+      err.code = HttpCode.BAD_REQUEST;
+      err.message = `Contact with this field 
+      ${JSON.stringify(err.keyValue).replace(/"/g, "'")} already exist.`;
     }
 
     next(err);
@@ -87,24 +107,28 @@ const updateContact = async (req, res, next) => {
 
 const removeContact = async (req, res, next) => {
   try {
-    const contact = await contacts.dbRemoveContact(req.params.contactId);
-    console.log(contact);
+    const userId = req.user?.id;
+    const contact = await contacts.dbRemoveContact(
+      req.params.contactId,
+      userId
+    );
+
     if (contact) {
       return res.json({
         status: "success",
-        code: 200,
-        data: { contact },
-      });
-    } else {
-      return res.status(404).json({
-        status: "404 Not Found",
-        message: `Contact with this id: ${req.params.contactId} is absent.`,
+        code: HttpCode.OK,
+        ResponseBody: { contact },
       });
     }
+
+    return res.status(HttpCode.NOT_FOUND).json({
+      status: `${HttpCode.NOT_FOUND} Not Found`,
+      message: `Contact with this id: ${req.params.contactId} is absent.`,
+    });
   } catch (err) {
-    err.status = "error";
+    err.status = "Bad Request";
     if (err.name === "CastError") {
-      err.code = 400;
+      err.code = HttpCode.BAD_REQUEST;
       err.message = "Id format is not correct.";
     }
     next(err);

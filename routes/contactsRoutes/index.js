@@ -8,17 +8,14 @@ const {
   removeContact,
 } = require("../../controller/contacts.js");
 const { validatePatch, validatePostPut } = require("./inputValidation.js");
+const guard = require("../../helpers/guard");
 
-router.get("/", getAll);
+router.get("/", guard, getAll).post("/", guard, validatePostPut, addContact);
 
-router.get("/:contactId", getContactById);
-
-router.post("/", validatePostPut, addContact);
-
-router.put("/:contactId", validatePostPut, updateContact);
-
-router.delete("/:contactId", removeContact);
-
-router.patch("/:contactId", validatePatch, updateContact);
+router
+  .get("/:contactId", guard, getContactById)
+  .put("/:contactId", guard, validatePostPut, updateContact)
+  .delete("/:contactId", guard, removeContact)
+  .patch("/:contactId", guard, validatePatch, updateContact);
 
 module.exports = router;
