@@ -1,19 +1,20 @@
-const UserSchema = require('../model/schemas/user.js');
-const HttpCode = require('../helpers/constants.js');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-const jimp = require('jimp');
-const fs = require('fs/promises');
-const path = require('path');
+const UserSchema = require("../model/schemas/user.js");
+const HttpCode = require("../helpers/constants.js");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
+const jimp = require("jimp");
+const fs = require("fs/promises");
+const path = require("path");
+const { dbUpdateAvatar } = require("../model/users");
 
 const registration = async (req, res, next) => {
   const userExist = await UserSchema.findOne({ email: req.body.email });
   if (userExist) {
     return res.status(HttpCode.CONFLICT).json({
       status: `${HttpCode.CONFLICT} Conflict`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
-        message: 'Email in use',
+        message: "Email in use",
       },
     });
   }
@@ -22,7 +23,7 @@ const registration = async (req, res, next) => {
     await newUser.save();
     return res.status(HttpCode.CREATED).json({
       status: `${HttpCode.CREATED} Created`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         user: {
           email: newUser.email,
@@ -44,20 +45,20 @@ const login = async (req, res, next) => {
       return res.status(HttpCode.UNAUTHORIZED).json({
         Status: `${HttpCode.UNAUTHORIZED} Unauthorized`,
         ResponseBody: {
-          message: 'Email or password is wrong',
+          message: "Email or password is wrong",
         },
       });
     }
 
     const payload = { id: foundUser.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
-      expiresIn: '2h',
+      expiresIn: "2h",
     });
     await UserSchema.updateOne({ _id: foundUser.id }, { token });
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         token,
         user: {
@@ -82,7 +83,7 @@ const logout = async (req, res, next) => {
 const getCurrentUser = async (req, res, next) => {
   return res.status(HttpCode.OK).json({
     Status: `${HttpCode.OK} OK`,
-    ContentType: 'application/json',
+    ContentType: "application/json",
     ResponseBody: {
       email: req.user.email,
       subscription: req.user.subscription,
@@ -101,7 +102,7 @@ const updateSubscr = async (req, res, next) => {
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         email: updatedUser.email,
         subscription: updatedUser.subscription,
@@ -116,11 +117,11 @@ const updateAvatar = async (req, res, next) => {
   const { id } = req.user;
   try {
     const avatarURL = await saveUserAvatar(req);
-    await UserSchema.updateOne({ _id: id }, { avatarURL });
+    await dbUpdateAvatar(id, avatarURL);
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         avatarURL: avatarURL,
       },
@@ -150,15 +151,15 @@ const saveUserAvatar = async (req) => {
 
   await fs.rename(
     filePath,
-    path.join(process.cwd(), 'public/avatars', newAvatarName)
+    path.join(process.cwd(), "public/avatars", newAvatarName)
   );
 
   const oldAvatarURL = req.user.avatarURL;
-  if (oldAvatarURL.includes('avatars/')) {
-    await fs.unlink(path.join(process.cwd(), 'public', oldAvatarURL));
+  if (oldAvatarURL.includes("avatars/")) {
+    await fs.unlink(path.join(process.cwd(), "public", oldAvatarURL));
   }
 
-  return path.join('avatars', newAvatarName).replace('\\', '/');
+  return path.join("avatars", newAvatarName).replace("\\", "/");
 };
 
 module.exports = {

@@ -8,6 +8,7 @@ describe("Unit test: helper/guard", () => {
     get: jest.fn((header) => {
       return `Bearer ${User.token}`;
     }),
+    user: User,
   };
   const res = {
     status: jest.fn().mockReturnThis(),
