@@ -6,7 +6,9 @@
     "start": "cross-env NODE_ENV=production node server.js",
     "dev": "cross-env NODE_ENV=development nodemon server.js",
     "lint": "eslint **/*.js",
-    "lint:fix": "eslint --fix **/*.js"
+    "lint:fix": "eslint --fix **/*.js",
+    "test": "cross-env NODE_ENV=test jest --no-cache --verbose --detectOpenHandles",
+    "test:coverage": "jest --coverage --passWithNoTests"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -33,6 +35,8 @@
     "eslint-plugin-json": "^2.1.2",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^4.2.1",
-    "nodemon": "2.0.7"
+    "jest": "^26.6.3",
+    "nodemon": "2.0.7",
+    "supertest": "^6.1.3"
   }
 }
