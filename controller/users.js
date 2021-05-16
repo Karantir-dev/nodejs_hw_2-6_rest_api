@@ -2,6 +2,17 @@ const UserSchema = require("../model/schemas/user.js");
 const HttpCode = require("../helpers/constants.js");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const jimp = require("jimp");
+const fs = require("fs/promises");
+const path = require("path");
+const {
+  createUser,
+  findByEmail,
+  dbUpdateAvatar,
+  findByVerificationToken,
+  updateVerificationStatus,
+} = require("../model/users");
+const MailgenService = require("../services/mailgenService");
 
 const registration = async (req, res, next) => {
   const userExist = await UserSchema.findOne({ email: req.body.email });
@@ -15,8 +26,15 @@ const registration = async (req, res, next) => {
     });
   }
   try {
-    const newUser = new UserSchema(req.body);
-    await newUser.save();
+    const newUser = await createUser(req.body);
+    const { email, verificationToken } = newUser;
+    try {
+      const emailService = new MailgenService(process.env.NODE_ENV);
+      await emailService.sendVerificationLetter(verificationToken, email);
+    } catch (e) {
+      // logger
+      console.log(e.message);
+    }
     return res.status(HttpCode.CREATED).json({
       status: `${HttpCode.CREATED} Created`,
       ContentType: "application/json",
@@ -37,7 +55,7 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
     const foundUser = await UserSchema.findOne({ email });
     const isValidPassword = await foundUser?.isValidPassword(password);
-    if (!foundUser || !isValidPassword) {
+    if (!foundUser || !isValidPassword || !foundUser.verified) {
       return res.status(HttpCode.UNAUTHORIZED).json({
         Status: `${HttpCode.UNAUTHORIZED} Unauthorized`,
         ResponseBody: {
@@ -109,4 +127,122 @@ const updateSubscr = async (req, res, next) => {
   }
 };
 
-module.exports = { registration, login, logout, getCurrentUser, updateSubscr };
+const updateAvatar = async (req, res, next) => {
+  const { id } = req.user;
+  try {
+    const avatarURL = await saveUserAvatar(req);
+    await dbUpdateAvatar(id, avatarURL);
+
+    return res.status(HttpCode.OK).json({
+      Status: `${HttpCode.OK} OK`,
+      ContentType: "application/json",
+      ResponseBody: {
+        avatarURL: avatarURL,
+      },
+    });
+  } catch (err) {
+    console.log(err.message);
+  }
+};
+
+const saveUserAvatar = async (req) => {
+  const filePath = req.file.path;
+
+  const newAvatarName = `${Date.now().toString()}-${req.file.originalname}`;
+  await jimp
+    .read(filePath)
+    .then((img) => {
+      img
+        .autocrop()
+        .cover(
+          250,
+          250,
+          jimp.HORIZONTAL_ALIGN_CENTER | jimp.VERTICAL_ALIGN_MIDDLE
+        )
+        .write(filePath);
+    })
+    .catch((err) => console.log(err.message));
+
+  await fs.rename(
+    filePath,
+    path.join(process.cwd(), "public/avatars", newAvatarName)
+  );
+
+  const oldAvatarURL = req.user.avatarURL;
+  if (oldAvatarURL.includes("avatars/")) {
+    await fs.unlink(path.join(process.cwd(), "public", oldAvatarURL));
+  }
+
+  return path.join("avatars", newAvatarName).replace("\\", "/");
+};
+
+const verifyEmail = async (req, res, next) => {
+  try {
+    const user = await findByVerificationToken(req.params.token);
+    if (user) {
+      await updateVerificationStatus(user.id, true);
+      return res.status(HttpCode.OK).json({
+        Status: `${HttpCode.OK} OK`,
+        ResponseBody: {
+          message: "Verification successful",
+        },
+      });
+    }
+
+    return res.status(HttpCode.NOT_FOUND).json({
+      Status: `${HttpCode.NOT_FOUND} Not Found`,
+      ResponseBody: {
+        message: "User not found",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const repeatEmailVerification = async (req, res, next) => {
+  try {
+    const user = await findByEmail(req.body.email);
+    if (!user) {
+      return res.status(HttpCode.NOT_FOUND).json({
+        status: "error",
+        code: HttpCode.NOT_FOUND,
+        message: "User not found",
+      });
+    }
+
+    if (user.verified) {
+      return res.status(HttpCode.BAD_REQUEST).json({
+        Status: `${HttpCode.BAD_REQUEST} Bad Request`,
+        ContentType: "application/json",
+        ResponseBody: {
+          message: "Verification has already been passed",
+        },
+      });
+    }
+
+    const { verificationToken, email } = user;
+    const emailService = new MailgenService(process.env.NODE_ENV);
+    await emailService.sendVerificationLetter(verificationToken, email);
+    return res.status(HttpCode.OK).json({
+      Status: `${HttpCode.OK} Ok`,
+      ContentType: " application/json",
+      ResponseBody: {
+        message: "Verification email sent",
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  registration,
+  login,
+  logout,
+  getCurrentUser,
+  updateSubscr,
+  updateAvatar,
+  verifyEmail,
+  repeatEmailVerification,
+};

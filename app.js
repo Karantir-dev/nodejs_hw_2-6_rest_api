@@ -8,8 +8,8 @@ const usersRouter = require("./routes/usersRoutes");
 const app = express();
 
 const formatsLogger = app.get("env") === "development" ? "dev" : "short";
-
-app.use(logger(formatsLogger));
+app.use(express.static("public"));
+app.get("env") !== "test" && app.use(logger(formatsLogger));
 app.use(cors());
 app.use(express.json());
 
