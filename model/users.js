@@ -1,4 +1,4 @@
-const UserSchema = require('./schemas/user.js');
+const UserSchema = require("./schemas/user.js");
 
 const createUser = async (userOptions) => {
   const user = new UserSchema(userOptions);
@@ -24,8 +24,13 @@ const updateVerificationStatus = async (id, status) => {
   );
 };
 
+const findByEmail = async (email) => {
+  return await UserSchema.findOne({ email });
+};
+
 module.exports = {
   createUser,
+  findByEmail,
   dbUpdateAvatar,
   findUser,
   findByVerificationToken,

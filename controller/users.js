@@ -1,26 +1,27 @@
-const UserSchema = require('../model/schemas/user.js');
-const HttpCode = require('../helpers/constants.js');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-const jimp = require('jimp');
-const fs = require('fs/promises');
-const path = require('path');
+const UserSchema = require("../model/schemas/user.js");
+const HttpCode = require("../helpers/constants.js");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
+const jimp = require("jimp");
+const fs = require("fs/promises");
+const path = require("path");
 const {
   createUser,
+  findByEmail,
   dbUpdateAvatar,
   findByVerificationToken,
   updateVerificationStatus,
-} = require('../model/users');
-const mailgenService = require('../services/mailgenService');
+} = require("../model/users");
+const MailgenService = require("../services/mailgenService");
 
 const registration = async (req, res, next) => {
   const userExist = await UserSchema.findOne({ email: req.body.email });
   if (userExist) {
     return res.status(HttpCode.CONFLICT).json({
       status: `${HttpCode.CONFLICT} Conflict`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
-        message: 'Email in use',
+        message: "Email in use",
       },
     });
   }
@@ -28,7 +29,7 @@ const registration = async (req, res, next) => {
     const newUser = await createUser(req.body);
     const { email, verificationToken } = newUser;
     try {
-      const emailService = new mailgenService(process.env.NODE_ENV);
+      const emailService = new MailgenService(process.env.NODE_ENV);
       await emailService.sendVerificationLetter(verificationToken, email);
     } catch (e) {
       // logger
@@ -36,7 +37,7 @@ const registration = async (req, res, next) => {
     }
     return res.status(HttpCode.CREATED).json({
       status: `${HttpCode.CREATED} Created`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         user: {
           email: newUser.email,
@@ -58,20 +59,20 @@ const login = async (req, res, next) => {
       return res.status(HttpCode.UNAUTHORIZED).json({
         Status: `${HttpCode.UNAUTHORIZED} Unauthorized`,
         ResponseBody: {
-          message: 'Email or password is wrong',
+          message: "Email or password is wrong",
         },
       });
     }
 
     const payload = { id: foundUser.id };
     const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
-      expiresIn: '2h',
+      expiresIn: "2h",
     });
     await UserSchema.updateOne({ _id: foundUser.id }, { token });
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         token,
         user: {
@@ -96,7 +97,7 @@ const logout = async (req, res, next) => {
 const getCurrentUser = async (req, res, next) => {
   return res.status(HttpCode.OK).json({
     Status: `${HttpCode.OK} OK`,
-    ContentType: 'application/json',
+    ContentType: "application/json",
     ResponseBody: {
       email: req.user.email,
       subscription: req.user.subscription,
@@ -115,7 +116,7 @@ const updateSubscr = async (req, res, next) => {
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         email: updatedUser.email,
         subscription: updatedUser.subscription,
@@ -134,7 +135,7 @@ const updateAvatar = async (req, res, next) => {
 
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} OK`,
-      ContentType: 'application/json',
+      ContentType: "application/json",
       ResponseBody: {
         avatarURL: avatarURL,
       },
@@ -164,15 +165,15 @@ const saveUserAvatar = async (req) => {
 
   await fs.rename(
     filePath,
-    path.join(process.cwd(), 'public/avatars', newAvatarName)
+    path.join(process.cwd(), "public/avatars", newAvatarName)
   );
 
   const oldAvatarURL = req.user.avatarURL;
-  if (oldAvatarURL.includes('avatars/')) {
-    await fs.unlink(path.join(process.cwd(), 'public', oldAvatarURL));
+  if (oldAvatarURL.includes("avatars/")) {
+    await fs.unlink(path.join(process.cwd(), "public", oldAvatarURL));
   }
 
-  return path.join('avatars', newAvatarName).replace('\\', '/');
+  return path.join("avatars", newAvatarName).replace("\\", "/");
 };
 
 const verifyEmail = async (req, res, next) => {
@@ -183,7 +184,7 @@ const verifyEmail = async (req, res, next) => {
       return res.status(HttpCode.OK).json({
         Status: `${HttpCode.OK} OK`,
         ResponseBody: {
-          message: 'Verification successful',
+          message: "Verification successful",
         },
       });
     }
@@ -191,7 +192,7 @@ const verifyEmail = async (req, res, next) => {
     return res.status(HttpCode.NOT_FOUND).json({
       Status: `${HttpCode.NOT_FOUND} Not Found`,
       ResponseBody: {
-        message: 'User not found',
+        message: "User not found",
       },
     });
   } catch (err) {
@@ -201,33 +202,33 @@ const verifyEmail = async (req, res, next) => {
 
 const repeatEmailVerification = async (req, res, next) => {
   try {
-    const user = await Users.findByEmail(req.body.email);
+    const user = await findByEmail(req.body.email);
     if (!user) {
       return res.status(HttpCode.NOT_FOUND).json({
-        status: 'error',
+        status: "error",
         code: HttpCode.NOT_FOUND,
-        message: 'User not found',
+        message: "User not found",
       });
     }
 
     if (user.verified) {
       return res.status(HttpCode.BAD_REQUEST).json({
         Status: `${HttpCode.BAD_REQUEST} Bad Request`,
-        ContentType: 'application/json',
+        ContentType: "application/json",
         ResponseBody: {
-          message: 'Verification has already been passed',
+          message: "Verification has already been passed",
         },
       });
     }
 
-    const { verifyTokenEmail, email } = user;
-    const emailService = new EmailService(process.env.NODE_ENV);
-    await emailService.sendVerificationLetter(verifyTokenEmail, email);
+    const { verificationToken, email } = user;
+    const emailService = new MailgenService(process.env.NODE_ENV);
+    await emailService.sendVerificationLetter(verificationToken, email);
     return res.status(HttpCode.OK).json({
       Status: `${HttpCode.OK} Ok`,
-      ContentType: ' application/json',
+      ContentType: " application/json",
       ResponseBody: {
-        message: 'Verification email sent',
+        message: "Verification email sent",
       },
     });
   } catch (err) {
